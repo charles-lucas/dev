@@ -45,7 +45,7 @@ public class ContextKey : IEquatable<ContextKey>
         return result;
     }
 
-    public bool EmptyKey()
+    public bool Empty()
     {
         return _key.Length == 0;
     }
@@ -114,6 +114,18 @@ public class ContextKey : IEquatable<ContextKey>
                 result += _key[i];
             }
             result = (result & mask) | (_key.Length << 28);
+        }
+
+        return result;
+    }
+
+    public override string ToString()
+    {
+        string result = "";
+
+        foreach(byte bite in _key)
+        {
+            result += String.Format("{0:x2} ", bite);
         }
 
         return result;
