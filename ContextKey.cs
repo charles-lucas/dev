@@ -72,7 +72,7 @@ public class ContextKey : IEquatable<ContextKey>
     public bool Equals(ContexKey? other)
     {
         bool result = false;
-        bool allElementsEqual = true;
+        bool allElementsCompareFail = false;
 
         if(_key.Length == other.Key.Length)
         {
@@ -80,10 +80,10 @@ public class ContextKey : IEquatable<ContextKey>
             {
                 if(_key[i] != other.Key[i])
                 {
-                    allElementsEqual = false;
+                    allElementsCompareFail = true;
                 }
             }
-            result = allElementsEqual;
+            result = !allElementsCompareFail;
         }
 
         return result;

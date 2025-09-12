@@ -1,65 +1,3 @@
-public class Stat : IEquatable<Stat>
-{
-    Stat()
-    {
-        _symbol = 0x0;
-        _count = 0;
-    }
-
-    Stat(byte symbol, Int32 count)
-    {
-        _symbol = symbol;
-        _count = count;
-    }
-
-    public void Increment()
-    {
-        _count++;
-    }
-
-    public void Flush()
-    {
-        _count = count / 2;
-    }
-
-    public override Equals(Stats other)
-    {
-        return _symbol == other.Symbol;
-    }
-
-    public override bool Equals(object obj)
-    {
-        if (obj == null) return false;
-        Stat objAsStat = obj as Stat;
-        if (objAsStat == null) return false;
-        else return Equals(objAsStat);
-    }
-
-    public override int GetHashCode()
-    {
-        return _symbol;
-    }
-
-    public byte Symbol
-    {
-        get
-        {
-            return _symbol;
-        }
-    }
-
-    public Int32 Count
-    {
-        get
-        {
-            return _count;
-        }
-    }
-
-    private byte _symbol;
-    private Int32 _count;
-}
-
 public class Context
 {
     public Context()
@@ -77,6 +15,7 @@ public class Context
     public Context(Stat stat)
     {
         _stats = new List<Stat>();
+        _order = Order.Model;
         _stats.Add(stat);
     }
 
@@ -116,11 +55,15 @@ public class Context
         }
     }
 
+    public Update(byte symbol) => Update(new Stat(symbol, 0));
+
     public Uint16[] Totalize(UInt16[] scoreboard)
     {
         UInt16 result[] = new UInt16[258];
+        UInt16 max = 0;
+        int i = 0;
 
-        for ( ; ; )
+        while(true)
         {
             max = 0;
             i = _stats.Length + 1;
@@ -150,7 +93,7 @@ public class Context
             }
             else 
             {
-                result[ 0 ] = (Int16) ( 256 - (_stats.Length-1) );
+                result[ 0 ] = (Int16)( 256 - (_stats.Length-1) );
                 result[ 0 ] *= (_stats.Length-1);
                 result[ 0 ] /= 256;
                 result[ 0 ] /= max;
@@ -163,6 +106,7 @@ public class Context
             }
             Rescale();
         }
+        
         for ( i = 0 ; i < (_stats.Length-1) ; i++ )
         {
             if (_stats[i].Count != 0)

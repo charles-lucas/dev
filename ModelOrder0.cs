@@ -1,93 +1,33 @@
-public class ModelOrder0 : public ModelInterface
+public class ModelOrder0 : public IModel
 {
     public Model0()
     {
-        Initialize();
-    }
-
-    public void override Encode(Stream input, Stream output)
-    {
-        Int32 character;
-        Symbol symbol = new Symbol();
-        byte bite = 0x0;
-        bool escaped;
-        bool flush = false;
-        Int16 text_count = 0;
-
-        while(true)
-        {
-            character = input.ReadByte();
-            if ( ( ++text_count & 0x0ff ) == 0 )
-            {
-                flush = CheckCompression( input, output );
-            }
-        if ( !flush )
-        {
-            character = input.ReadByte();
-        }
-        else
-        {
-            character = Constants.FLUSH;
-        }
-        if ( character == Constants.EOF )
-        {
-            character = Constants.DONE;
-        }
-        do
-        {
-            escaped = ConvertIntToSymbol( character, symbol);
-            EncodeSymbol( output, symbol );
-        } while ( escaped );
-        if ( character == DONE )
-        {
-            break;
-        }
-        if ( character == FLUSH )
-        {
-            Flush();
-            flush = 0;
-        }
-        Update( character );
-        AddCharacter( character );
-    }
-
-    public void override Decode(Stream input, Stream output)
-    {
-
-    }
-
-    private void Initialize()
-    {
+        Context context0 = new Context();
+        _contexts = new Dictionary<ContexKey, Context>();
+        _escapedContexts = new List<ContextKey>();
+        _allSymbolContext = new Context(Order.AllSymbols);
+        _controlContext = new Context(Order.Control);
         _scoreboard = new byte[256];
         _totals = new UInt16[16];
-        _contexts = new Dictionary<ContextKey, Context>();
-        InitializeAllSysmbolsContext();
-        InitializeControlContext();
         _order = Order.Model;
         _contextKey = new ContexKey();
-        _order = Order.AllSymbols;
-    }
 
-    private void InitializeAllSysmbolsContext()
-    {
-        _allsymbols = new Context();
-        for(byte bite = 0x0; bite <= 0xFF; bite++ )
+        _contexts.Add(_contextKey, context0);
+
+        _controlContext.Add(-Constants.FLUSH);
+        _controlContext.Add(-Constants.DONE);
+
+        for(int bite = 0x0; bite <= 256; bite++ )
         {
-            _allsymbols.Update(new Stat(bite, 0));
+            _allSymbolContext.Update((byte)bite);
         }
-    }
-
-    private void InitializeControlContext()
-    {
-        _controls.Add(-Constants.FLUSH, 1);
-        _controls.Add(-Constants.DONE, 1);
     }
 
     private bool ConvertIntToSymbol(Int32 character, Symbol symbol)
     {
         int i;
         Context table;
-        Uint16 totals[];
+        Uint16[] totals;
         
         if(_order == Order.Model)
         {
@@ -95,11 +35,11 @@ public class ModelOrder0 : public ModelInterface
         }
         else if(_oder == Order.AllSymbols)
         {
-            table = _allsymbols;
+            table = _allSymbolContext;
         }
         else
         {
-            table = _controls;
+            table = _controlContext;
         }
 
         //TotalizeTable( table );
@@ -111,10 +51,10 @@ public class ModelOrder0 : public ModelInterface
         {
             character = -character;
         }
-        //for ( i = 0 ; i <= table->max_index ; i++ )
+
         foreach(Stats stat in table.Stats)
         {
-            if ( character == (int) stat.Symbol )
+            if ( character == stat.Symbol )
             {
                 if ( stat.Count == 0 )
                 {
@@ -135,72 +75,82 @@ public class ModelOrder0 : public ModelInterface
 
     private Order DecrementOrder()
     {
-        switch(_order)
+        if(_order == Order.Model)
         {
-            case Order.AllSymbols:
-                _order = Order.Control;
-                break;
-            case Order.Model:
-                _order = Order.AllSymbols;
-                break;
-        }
-    }
-
-    private void EncodeSymbol(Stream output, Symbol symbol )
-    {
-        Int32 range;
-        /*
-         * These three lines rescale high and low for the new symbol.
-        */
-        range = (Int32) ( high-low ) + 1;
-        high = low + (UInt16)(( range * symbol.HighCount ) / symbol.Scale -1 );
-        low = low + (UInt16)(( range * symbol.LowCount ) / symbol.Scale );
-        /*
-         * This loop turns out new bits until high and low are far enough
-         * apart to have stabilized.
-        */
-        for ( ; ; )
-        {
-            /*
-             * If this test passes, it means that the MSDigits match, and can
-             * be sent to the output stream.
-            */
-            if ( ( high & 0x8000 ) == ( low & 0x8000 ) )
+            _escapedContexts.Add(_contextKey);
+            if(!_contextKey.Empty())
             {
-                OutputBit( stream, high & 0x8000 );
-                while ( underflow_bits > 0 )
+                _contextKey = _contextKey.GetLesser();
+                if(!_contexts.ContainsKey(_contextKey))
                 {
-                    OutputBit( stream, ~high & 0x8000 );
-                    underflow_bits--;
+                    _contexts.Add(_contextKey, new Context());
                 }
-            }
-            /*
-             * If this test passes, the numbers are in danger of underflow, because
-             * the MSDigits don't match, and the 2nd digits are just one apart.
-            */
-            else if ( ( low & 0x4000 ) && !( high & 0x4000 ))
-            {
-                underflow_bits += 1;
-                low &= 0x3fff;
-                high |= 0x4000;
             }
             else
             {
-                return ;
+                switch(_order)
+                {
+                    case Order.Model:
+                        _order = Order.AllSymbols;
+                        break;
+                    case Order.AllSymbols:
+                        _order = Order.Control;
+                        break;
+                    default:
+                        _order = Order.Control;
+                        break;
+                }
             }
-            low <<= 1;
-            high <<= 1;
-            high |= 1;
+        }
+        else
+        {
+            _order = Order.Control;
+        }
+    }
+
+    public void Flush()
+    {
+        foreach Context (context in _contextValues);
+        {
+            context.Rescale();
+        }
+    }
+
+    public void Update(Int32 character)
+    {
+        if(character >= 0)
+        {
+            foreach(ContexKey key in _escapedContexts)
+            {
+                _contexts[key].Update((byte)character);
+            }
+            if(_order == Order.Model)
+            {
+                _contexts[_contextKey].Update((byte)character);
+            }
+            _escapedContexts.Clear();
+        }
+    }
+
+    public void AddCharacter(Int32 character)
+    {
+        if(character >= 0 )
+        {
+            _contextKey = new ContainsKey(_context, (byte)character);
+            if(!_contexts.ContainsKey(_contextKey))
+            {
+                _contexts.Add(_contextKey, new Context());
+            }
+            _order = Order.Model;
         }
     }
 
     private Dictionary<ContextKey, Context> _contexts;
-    private Context _allsymbols;
-    private Context _controls;
+    private List<ContainsKey> _escapedContexts;
+    private Context _allSymbolContext;
+    private Context _controlContext;
     private byte[] _scoreboard;
     private UInt16[] _totals;
     private Order _order;
     private ContexKey _contextKey;
-    private UInt16 low;
-    private UInt16 high;
 }
